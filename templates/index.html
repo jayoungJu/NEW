@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>퀀트 에이전트 대시보드</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #161b22 0%, #1c2128 100%);
+      border-bottom: 1px solid #30363d;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; color: #58a6ff; }
+    header .subtitle { font-size: 0.8rem; color: #8b949e; margin-top: 2px; }
+    .badge {
+      background: #1f6feb33;
+      border: 1px solid #1f6feb;
+      color: #58a6ff;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 24px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .card-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #21262d;
+    }
+
+    /* ── Form ── */
+    label { display: block; font-size: 0.82rem; color: #8b949e; margin-bottom: 6px; }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      padding: 9px 12px;
+      font-size: 0.82rem;
+      margin-bottom: 14px;
+      transition: border-color 0.2s;
+    }
+    input:focus { outline: none; border-color: #58a6ff; }
+
+    .btn-run {
+      width: 100%;
+      background: linear-gradient(135deg, #238636, #2ea043);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      letter-spacing: 0.5px;
+    }
+    .btn-run:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-run:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    /* ── Status indicators ── */
+    .status-row {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      transition: border-color 0.3s;
+    }
+    .step-item.active { border-color: #388bfd; background: #1c2a3a; }
+    .step-item.done { border-color: #2ea043; background: #122119; }
+    .step-item.error { border-color: #da3633; background: #2a1212; }
+    .step-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #30363d;
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .step-item.active .step-dot { background: #388bfd; animation: pulse 1s infinite; }
+    .step-item.done .step-dot { background: #2ea043; }
+    .step-item.error .step-dot { background: #da3633; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+    /* ── Right panel ── */
+    .right-panel { display: flex; flex-direction: column; gap: 16px; }
+
+    /* ── Metrics grid ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .metric {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+    }
+    .metric-label { font-size: 0.72rem; color: #8b949e; margin-bottom: 6px; }
+    .metric-value { font-size: 1.3rem; font-weight: 700; color: #58a6ff; }
+    .metric-value.green { color: #3fb950; }
+    .metric-value.red { color: #f85149; }
+    .metric-value.yellow { color: #d29922; }
+
+    /* ── Trade setup box ── */
+    .setup-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .setup-item { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 12px; }
+    .setup-item .s-label { font-size: 0.72rem; color: #8b949e; margin-bottom: 4px; }
+    .setup-item .s-value { font-size: 1rem; font-weight: 700; }
+    .signal-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .signal-강력\ 진입 { background: #1a3a1e; color: #3fb950; border: 1px solid #2ea043; }
+    .signal-진입\ 고려 { background: #2a2a0a; color: #d29922; border: 1px solid #9e6a03; }
+    .signal-대기       { background: #2a1212; color: #f85149; border: 1px solid #da3633; }
+
+    /* ── Log console ── */
+    .log-console {
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.78rem;
+      color: #8b949e;
+      max-height: 200px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+    .log-line { padding: 1px 0; }
+    .log-line.info  { color: #8b949e; }
+    .log-line.tool  { color: #388bfd; }
+    .log-line.think { color: #a5d6ff; }
+    .log-line.ok    { color: #3fb950; }
+    .log-line.err   { color: #f85149; }
+
+    /* ── Final report ── */
+    #finalReport {
+      background: #0d1117;
+      border: 1px solid #2ea043;
+      border-radius: 8px;
+      padding: 18px;
+      font-size: 0.85rem;
+      line-height: 1.8;
+      white-space: pre-wrap;
+      color: #e6edf3;
+      max-height: 400px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    /* ── Kill switch alert ── */
+    .kill-alert {
+      background: #2a1212;
+      border: 1px solid #da3633;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #f85149;
+      font-size: 0.83rem;
+      font-weight: 600;
+      display: none;
+      margin-bottom: 8px;
+    }
+
+    /* ── Price levels ── */
+    .levels-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .level-tag {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .level-tag.support    { background: #122119; color: #3fb950; border: 1px solid #2ea04366; }
+    .level-tag.resistance { background: #2a1212; color: #f85149; border: 1px solid #da363366; }
+
+    .hidden { display: none !important; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📈 퀀트 투자 에이전트</h1>
+    <div class="subtitle">메모 전략 통합 | 지지선 진입 · RRR ≥ 1:2 · 분할 매매 · 칼손절</div>
+  </div>
+  <span class="badge">Claude Sonnet</span>
+</header>
+
+<div class="container">
+
+  <!-- ── Left: Control Panel ── -->
+  <div>
+    <div class="card">
+      <div class="card-title">API 설정</div>
+      <label>FRED API KEY</label>
+      <input type="text" id="fredKey" value="efd12b0029754ccf82d612d6c1272fab" />
+      <label>ANTHROPIC API KEY</label>
+      <input type="password" id="anthropicKey" placeholder="sk-ant-api03-..." />
+      <button class="btn-run" id="runBtn" onclick="startAgent()">▶ 에이전트 구동</button>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="card-title">실행 단계</div>
+      <div class="status-row">
+        <div class="step-item" id="step-macro">
+          <div class="step-dot"></div>
+          <span>① 거시경제 지표 조회 (FRED)</span>
+        </div>
+        <div class="step-item" id="step-price">
+          <div class="step-dot"></div>
+          <span>② 가격 & 지지/저항 분석</span>
+        </div>
+        <div class="step-item" id="step-setup">
+          <div class="step-dot"></div>
+          <span>③ 매매 전략 수치화</span>
+        </div>
+        <div class="step-item" id="step-order">
+          <div class="step-dot"></div>
+          <span>④ 모의 주문 실행</span>
+        </div>
+        <div class="step-item" id="step-report">
+          <div class="step-dot"></div>
+          <span>⑤ 보고서 저장</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Right: Results Panel ── -->
+  <div class="right-panel">
+
+    <!-- Macro Metrics -->
+    <div class="card" id="macroCard">
+      <div class="card-title">거시경제 지표</div>
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="metric-label">장단기 금리차 (T10Y2Y)</div>
+          <div class="metric-value" id="m-t10y2y">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">실업률 (UNRATE)</div>
+          <div class="metric-value" id="m-unrate">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">VIX 공포지수</div>
+          <div class="metric-value" id="m-vix">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">원달러 환율</div>
+          <div class="metric-value" id="m-usdkrw">—</div>
+        </div>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <div style="font-size:0.8rem; color:#8b949e;">경제 국면</div>
+        <div id="m-phase" style="font-weight:700; color:#d29922; font-size:0.9rem;">—</div>
+        <div style="font-size:0.8rem; color:#8b949e; margin-left:16px;">추천 종목</div>
+        <div id="m-ticker" style="font-weight:700; color:#58a6ff; font-size:0.9rem;">—</div>
+      </div>
+      <div class="kill-alert" id="killAlert">⚠ Kill Switch 발동</div>
+    </div>
+
+    <!-- Price Analysis -->
+    <div class="card" id="priceCard">
+      <div class="card-title">가격 분석</div>
+      <div class="metrics-grid" style="grid-template-columns: repeat(3,1fr);">
+        <div class="metric">
+          <div class="metric-label">현재가</div>
+          <div class="metric-value" id="p-price">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">추세</div>
+          <div class="metric-value" id="p-trend">—</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">지지선까지 거리</div>
+          <div class="metric-value" id="p-dist">—</div>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <div style="font-size:0.75rem; color:#8b949e; margin-bottom:6px;">지지선</div>
+        <div class="levels-row" id="p-supports"></div>
+        <div style="font-size:0.75rem; color:#8b949e; margin: 10px 0 6px;">저항선</div>
+        <div class="levels-row" id="p-resistances"></div>
+      </div>
+    </div>
+
+    <!-- Trade Setup -->
+    <div class="card" id="setupCard">
+      <div class="card-title">매매 전략</div>
+      <span class="signal-badge" id="s-signal">—</span>
+      <div class="setup-grid">
+        <div class="setup-item">
+          <div class="s-label">진입가</div>
+          <div class="s-value" id="s-entry">—</div>
+        </div>
+        <div class="setup-item">
+          <div class="s-label">손절가</div>
+          <div class="s-value red" id="s-stop">—</div>
+        </div>
+        <div class="setup-item">
+          <div class="s-label">1차 익절</div>
+          <div class="s-value green" id="s-t1">—</div>
+        </div>
+        <div class="setup-item">
+          <div class="s-label">2차 익절</div>
+          <div class="s-value green" id="s-t2">—</div>
+        </div>
+        <div class="setup-item">
+          <div class="s-label">RRR</div>
+          <div class="s-value" id="s-rrr">—</div>
+        </div>
+        <div class="setup-item">
+          <div class="s-label">분할 비율</div>
+          <div class="s-value" id="s-split">—</div>
+        </div>
+      </div>
+      <div style="margin-top:12px; font-size:0.8rem; color:#8b949e; line-height:1.6;" id="s-reason"></div>
+    </div>
+
+    <!-- Log -->
+    <div class="card">
+      <div class="card-title">실행 로그</div>
+      <div class="log-console" id="logConsole">
+        <div class="log-line info">에이전트 대기 중...</div>
+      </div>
+    </div>
+
+    <!-- Final Report -->
+    <div class="card" id="reportCard" style="display:none;">
+      <div class="card-title">최종 투자 판단</div>
+      <pre id="finalReport"></pre>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let es = null;
+
+  function addLog(text, cls = 'info') {
+    const c = document.getElementById('logConsole');
+    const d = document.createElement('div');
+    d.className = `log-line ${cls}`;
+    const ts = new Date().toLocaleTimeString('ko-KR');
+    d.textContent = `[${ts}] ${text}`;
+    c.appendChild(d);
+    c.scrollTop = c.scrollHeight;
+  }
+
+  function setStep(id, state) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('active', 'done', 'error');
+    el.classList.add(state);
+  }
+
+  function fmtNum(v, digits = 2) {
+    if (v === null || v === undefined) return '—';
+    return Number(v).toFixed(digits);
+  }
+
+  function startAgent() {
+    const fredKey = document.getElementById('fredKey').value.trim();
+    const anthKey = document.getElementById('anthropicKey').value.trim();
+    if (!fredKey || !anthKey) {
+      alert('API 키를 모두 입력하세요.');
+      return;
+    }
+
+    // Reset UI
+    document.getElementById('logConsole').innerHTML = '';
+    document.getElementById('reportCard').style.display = 'none';
+    document.getElementById('finalReport').style.display = 'none';
+    ['step-macro','step-price','step-setup','step-order','step-report'].forEach(id => {
+      document.getElementById(id).classList.remove('active','done','error');
+    });
+    ['m-t10y2y','m-unrate','m-vix','m-usdkrw','m-phase','m-ticker',
+     'p-price','p-trend','p-dist','s-signal','s-entry','s-stop','s-t1','s-t2','s-rrr','s-split','s-reason'
+    ].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '—';
+    });
+    document.getElementById('p-supports').innerHTML = '';
+    document.getElementById('p-resistances').innerHTML = '';
+    document.getElementById('killAlert').style.display = 'none';
+
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('runBtn').textContent = '⏳ 분석 중...';
+
+    if (es) es.close();
+
+    const url = `/run?fred_key=${encodeURIComponent(fredKey)}&anthropic_key=${encodeURIComponent(anthKey)}`;
+    es = new EventSource(url);
+
+    es.onmessage = function(e) {
+      const msg = JSON.parse(e.data);
+      handleEvent(msg.type, msg.data);
+    };
+
+    es.onerror = function() {
+      addLog('연결 오류 발생', 'err');
+      finish();
+    };
+  }
+
+  function handleEvent(type, data) {
+    switch(type) {
+
+      case 'log':
+        addLog(data, 'info');
+        break;
+
+      case 'tool_call':
+        const toolNames = {
+          fetch_macro_data: 'step-macro',
+          fetch_price_data: 'step-price',
+          evaluate_trade_setup: 'step-setup',
+          execute_mock_order: 'step-order',
+          save_report: 'step-report',
+        };
+        if (toolNames[data]) setStep(toolNames[data], 'active');
+        addLog(`🔧 ${data} 실행 중...`, 'tool');
+        break;
+
+      case 'macro':
+        setStep('step-macro', 'done');
+        document.getElementById('m-t10y2y').textContent = data.t10y2y !== null ? fmtNum(data.t10y2y) + '%' : 'N/A';
+        document.getElementById('m-unrate').textContent = data.unrrate !== null ? fmtNum(data.unrrate) + '%' : 'N/A';
+        const vixEl = document.getElementById('m-vix');
+        vixEl.textContent = data.vix !== null ? fmtNum(data.vix) : 'N/A';
+        if (data.vix > 30) vixEl.className = 'metric-value red';
+        document.getElementById('m-usdkrw').textContent = data.usdkrw !== null ? fmtNum(data.usdkrw, 0) + '원' : 'N/A';
+        document.getElementById('m-phase').textContent = data.economic_phase;
+        document.getElementById('m-ticker').textContent = data.recommended_ticker;
+        if (data.kill_switch_alerts && data.kill_switch_alerts.length > 0) {
+          const ka = document.getElementById('killAlert');
+          ka.style.display = 'block';
+          ka.textContent = '⚠ ' + data.kill_switch_alerts.join(' | ');
+        }
+        addLog(`거시 지표: 경제국면=${data.economic_phase}, 추천=${data.recommended_ticker}`, 'ok');
+        break;
+
+      case 'price':
+        setStep('step-price', 'done');
+        document.getElementById('p-price').textContent = '$' + fmtNum(data.current_price);
+        const trendEl = document.getElementById('p-trend');
+        trendEl.textContent = data.trend;
+        trendEl.className = 'metric-value ' + (data.trend==='상승'?'green': data.trend==='하락'?'red':'yellow');
+        document.getElementById('p-dist').textContent = fmtNum(data.distance_to_support_pct) + '%';
+        const supDiv = document.getElementById('p-supports');
+        supDiv.innerHTML = '';
+        (data.support_levels || []).forEach(v => {
+          const t = document.createElement('span');
+          t.className = 'level-tag support';
+          t.textContent = '$' + v;
+          supDiv.appendChild(t);
+        });
+        const resDiv = document.getElementById('p-resistances');
+        resDiv.innerHTML = '';
+        (data.resistance_levels || []).forEach(v => {
+          const t = document.createElement('span');
+          t.className = 'level-tag resistance';
+          t.textContent = '$' + v;
+          resDiv.appendChild(t);
+        });
+        addLog(`가격분석: ${data.ticker} $${data.current_price} | 추세: ${data.trend}`, 'ok');
+        break;
+
+      case 'setup':
+        setStep('step-setup', 'done');
+        const sig = data.entry_signal || '—';
+        const sigEl = document.getElementById('s-signal');
+        sigEl.textContent = sig;
+        sigEl.className = 'signal-badge signal-' + sig;
+        document.getElementById('s-entry').textContent = '$' + fmtNum(data.entry_price);
+        document.getElementById('s-stop').textContent  = '$' + fmtNum(data.stop_loss);
+        document.getElementById('s-t1').textContent    = '$' + fmtNum(data.target_1);
+        document.getElementById('s-t2').textContent    = '$' + fmtNum(data.target_2);
+        document.getElementById('s-rrr').textContent   = '1:' + fmtNum(data.rrr);
+        document.getElementById('s-split').textContent = data.split_ratio + ' (' + data.split_first_pct + '%+' + data.split_second_pct + '%)';
+        document.getElementById('s-reason').textContent = data.reason || '';
+        addLog(`전략: ${sig} | RRR 1:${data.rrr} | 분할 ${data.split_ratio}`, 'ok');
+        break;
+
+      case 'order':
+        setStep('step-order', data.status === 'executed' ? 'done' : 'error');
+        addLog(data.status === 'executed' ? '✅ 모의주문 실행: ' + data.message : '⏸ 주문 보류: ' + data.message,
+               data.status === 'executed' ? 'ok' : 'info');
+        break;
+
+      case 'report':
+        setStep('step-report', 'done');
+        addLog('📄 보고서 저장 완료: ' + data.filepath, 'ok');
+        break;
+
+      case 'think':
+        addLog('💭 ' + data.substring(0, 120) + (data.length > 120 ? '...' : ''), 'think');
+        break;
+
+      case 'final':
+        const rc = document.getElementById('reportCard');
+        rc.style.display = 'block';
+        const fr = document.getElementById('finalReport');
+        fr.style.display = 'block';
+        fr.textContent = data;
+        addLog('분석 완료!', 'ok');
+        break;
+
+      case 'error':
+        addLog('❌ 오류: ' + data, 'err');
+        ['step-macro','step-price','step-setup','step-order','step-report'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el.classList.contains('active')) setStep(id, 'error');
+        });
+        break;
+
+      case 'done':
+        finish();
+        break;
+    }
+  }
+
+  function finish() {
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runBtn').textContent = '▶ 에이전트 구동';
+    if (es) { es.close(); es = null; }
+  }
+</script>
+</body>
+</html>
