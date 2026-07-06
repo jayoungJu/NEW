@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#141824">
+<title>월급루팡: 몰래컴퍼니</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
+  html, body { height:100%; overflow:hidden; touch-action:none; overscroll-behavior:none; }
+  body {
+    font-family:'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+    background:#141824; color:#eef1f8;
+    display:flex; justify-content:center;
+  }
+  #app {
+    width:100%; max-width:440px; height:100dvh;
+    display:flex; flex-direction:column; position:relative; overflow:hidden;
+    background:linear-gradient(180deg,#1b2233 0%,#141824 60%);
+  }
+
+  /* ── 상단 HUD ───────────────────────── */
+  #hud { padding:calc(env(safe-area-inset-top,0px) + 10px) 14px 8px; z-index:5; }
+  #rankRow { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  #rankBadge {
+    background:linear-gradient(135deg,#ffd76a,#ff9f43); color:#3a2500;
+    font-weight:800; font-size:12px; padding:3px 10px; border-radius:20px; white-space:nowrap;
+  }
+  #rankProgress { flex:1; height:8px; background:#2a3145; border-radius:6px; overflow:hidden; }
+  #rankProgress > div { height:100%; width:0%; background:linear-gradient(90deg,#ffd76a,#ff9f43); transition:width .3s; border-radius:6px; }
+  #warnDots { font-size:13px; letter-spacing:2px; white-space:nowrap; }
+  #lpRow { display:flex; align-items:baseline; gap:6px; }
+  #lp { font-size:30px; font-weight:900; letter-spacing:-.5px; }
+  #lpUnit { font-size:14px; color:#8f9bbd; font-weight:700; }
+  #rateRow { font-size:12px; color:#8f9bbd; margin-top:2px; display:flex; gap:12px; }
+  #rateRow b { color:#7ee0a3; font-weight:700; }
+
+  /* ── 사무실 씬 ───────────────────────── */
+  #scene {
+    flex:1; position:relative; min-height:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+  }
+  #office {
+    position:absolute; inset:0;
+    background:
+      radial-gradient(ellipse 120% 60% at 50% 0%, #232c44 0%, transparent 60%),
+      linear-gradient(180deg, #1b2233 0%, #171d2c 100%);
+  }
+  /* 창문 */
+  .window {
+    position:absolute; top:8%; width:22%; height:20%; border-radius:6px;
+    background:linear-gradient(180deg,#31548c,#7ba7d9 130%);
+    box-shadow:inset 0 0 0 3px #10141f, inset 0 0 24px rgba(255,255,255,.15);
+  }
+  .window.w1 { left:8%; } .window.w2 { right:8%; }
+  .window::after { content:''; position:absolute; left:50%; top:0; bottom:0; width:3px; background:#10141f; }
+
+  /* 상사 */
+  #boss {
+    position:absolute; top:24%; left:50%; transform:translateX(-50%);
+    text-align:center; transition:transform .18s; z-index:2;
+  }
+  #bossEmoji { font-size:56px; display:block; transition:transform .15s; }
+  #bossTag { font-size:11px; color:#8f9bbd; background:#10141fcc; padding:2px 8px; border-radius:10px; }
+  #bossAlert {
+    position:absolute; top:-26px; left:50%; transform:translateX(-50%);
+    font-size:26px; font-weight:900; color:#ffd76a; opacity:0;
+    text-shadow:0 0 12px #ff9f43;
+  }
+  #boss.suspicious #bossAlert { opacity:1; animation:pulse .35s infinite alternate; }
+  #boss.watching #bossEmoji { transform:scaleX(-1) scale(1.15); }
+  #boss.watching #bossAlert { opacity:1; color:#ff6b6b; text-shadow:0 0 12px #ff3b3b; }
+  @keyframes pulse { from{transform:translateX(-50%) scale(1)} to{transform:translateX(-50%) scale(1.25)} }
+
+  /* 내 책상 */
+  #desk {
+    position:relative; width:92%; margin-bottom:12px; z-index:2;
+    background:linear-gradient(180deg,#3d4661,#2c3348);
+    border-radius:16px 16px 0 0; padding:10px 0 0;
+    box-shadow:0 -6px 24px rgba(0,0,0,.35);
+    text-align:center;
+  }
+  #monitor {
+    width:120px; height:80px; margin:0 auto; border-radius:8px;
+    background:#10141f; border:3px solid #454f6e; position:relative; overflow:hidden;
+  }
+  #screenContent {
+    position:absolute; inset:3px; border-radius:4px; font-size:34px;
+    display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg,#1c4a7a,#16395e); transition:background .2s;
+  }
+  #screenContent.slacking { background:linear-gradient(180deg,#e84393,#6c5ce7); }
+  #me { font-size:44px; margin-top:-6px; display:inline-block; transition:transform .12s; }
+  #me.typing { animation:wobble .18s infinite alternate; }
+  @keyframes wobble { from{transform:rotate(-4deg)} to{transform:rotate(4deg)} }
+
+  /* 콤보 표시 */
+  #combo {
+    position:absolute; right:6%; top:14%; z-index:3;
+    font-size:26px; font-weight:900; color:#7ee0a3; opacity:0;
+    transition:opacity .15s; text-shadow:0 2px 10px rgba(0,0,0,.5);
+  }
+  #combo.on { opacity:1; }
+  #combo small { display:block; font-size:11px; color:#8f9bbd; font-weight:600; text-align:right; }
+  #pot {
+    position:absolute; left:6%; top:14%; z-index:3; font-size:16px; font-weight:800;
+    color:#ffd76a; opacity:0; transition:opacity .15s;
+  }
+  #pot.on { opacity:1; }
+  #pot small { display:block; font-size:10px; color:#8f9bbd; font-weight:600; }
+
+  /* 피버 */
+  #fever {
+    position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:6;
+    background:linear-gradient(90deg,#ff6b6b,#ffa502); color:#fff; font-weight:900; font-size:13px;
+    padding:6px 16px; border-radius:20px; display:none; box-shadow:0 0 20px #ff6b6b88;
+    animation:pulse2 .4s infinite alternate;
+  }
+  @keyframes pulse2 { from{transform:translateX(-50%) scale(1)} to{transform:translateX(-50%) scale(1.08)} }
+
+  /* ── 홀드 버튼 ───────────────────────── */
+  #controls { padding:0 14px calc(env(safe-area-inset-bottom,0px) + 10px); z-index:5; }
+  #holdBtn {
+    width:100%; padding:20px 0 18px; border:none; border-radius:20px; cursor:pointer;
+    background:linear-gradient(180deg,#6c5ce7,#4834d4); color:#fff;
+    font-size:19px; font-weight:900; font-family:inherit; letter-spacing:-.3px;
+    box-shadow:0 6px 0 #2e1fa3, 0 10px 24px rgba(72,52,212,.35);
+    transition:transform .08s, box-shadow .08s, background .2s;
+  }
+  #holdBtn:active, #holdBtn.held {
+    transform:translateY(4px); box-shadow:0 2px 0 #2e1fa3;
+    background:linear-gradient(180deg,#e84393,#c2306f);
+  }
+  #holdBtn small { display:block; font-size:11px; font-weight:600; opacity:.85; margin-top:3px; }
+  #tabs { display:flex; gap:8px; margin-top:10px; }
+  .tabBtn {
+    flex:1; padding:11px 0; border:none; border-radius:12px; cursor:pointer;
+    background:#242c42; color:#aeb8d6; font-size:13px; font-weight:800; font-family:inherit;
+  }
+  .tabBtn .dot { color:#7ee0a3; display:none; }
+  .tabBtn.notify .dot { display:inline; }
+
+  /* ── 시트(상점/승진) ─────────────────── */
+  .sheet {
+    position:absolute; left:0; right:0; bottom:0; top:18%; z-index:20;
+    background:#1b2233; border-radius:24px 24px 0 0;
+    transform:translateY(105%); transition:transform .28s cubic-bezier(.2,.9,.3,1);
+    display:flex; flex-direction:column; box-shadow:0 -10px 40px rgba(0,0,0,.5);
+  }
+  .sheet.open { transform:translateY(0); }
+  .sheetHead { display:flex; align-items:center; justify-content:space-between; padding:16px 18px 10px; }
+  .sheetHead h2 { font-size:17px; font-weight:900; }
+  .closeBtn { background:#2a3145; border:none; color:#aeb8d6; width:32px; height:32px; border-radius:50%; font-size:15px; cursor:pointer; }
+  .sheetBody { flex:1; overflow-y:auto; padding:0 14px calc(env(safe-area-inset-bottom,0px) + 16px); -webkit-overflow-scrolling:touch; }
+
+  .shopItem {
+    display:flex; align-items:center; gap:12px; background:#222a40; border-radius:14px;
+    padding:12px; margin-bottom:10px;
+  }
+  .shopItem .icon { font-size:30px; width:40px; text-align:center; }
+  .shopItem .info { flex:1; min-width:0; }
+  .shopItem .info b { font-size:14px; display:block; }
+  .shopItem .info span { font-size:11px; color:#8f9bbd; display:block; margin-top:2px; }
+  .shopItem .lvl { font-size:10px; color:#7ee0a3; font-weight:700; }
+  .buyBtn {
+    border:none; border-radius:10px; padding:10px 12px; min-width:86px; cursor:pointer;
+    background:linear-gradient(180deg,#7ee0a3,#3dbb70); color:#0c2818;
+    font-weight:900; font-size:12px; font-family:inherit;
+  }
+  .buyBtn:disabled { background:#2a3145; color:#5a6480; }
+
+  #promoBox { text-align:center; padding:22px 10px; }
+  #promoBox .big { font-size:52px; }
+  #promoBox h3 { font-size:18px; margin:10px 0 6px; }
+  #promoBox p { font-size:13px; color:#8f9bbd; line-height:1.6; }
+  #promoBtn {
+    margin-top:16px; width:100%; padding:16px; border:none; border-radius:14px; cursor:pointer;
+    background:linear-gradient(135deg,#ffd76a,#ff9f43); color:#3a2500; font-size:16px; font-weight:900; font-family:inherit;
+  }
+  #promoBtn:disabled { background:#2a3145; color:#5a6480; }
+
+  /* ── 팝업/토스트 ─────────────────────── */
+  #floats { position:absolute; inset:0; pointer-events:none; z-index:15; overflow:hidden; }
+  .floatTxt {
+    position:absolute; font-weight:900; font-size:18px; color:#7ee0a3;
+    text-shadow:0 2px 8px rgba(0,0,0,.6); animation:floatUp 1s forwards;
+  }
+  .floatTxt.bad { color:#ff6b6b; font-size:22px; }
+  .floatTxt.gold { color:#ffd76a; }
+  @keyframes floatUp { 0%{opacity:0; transform:translateY(10px) scale(.8)} 15%{opacity:1; transform:translateY(0) scale(1.1)} 100%{opacity:0; transform:translateY(-70px) scale(1)} }
+
+  #toast {
+    position:absolute; top:20%; left:50%; transform:translateX(-50%) scale(.9); z-index:30;
+    background:#10141fee; border:1px solid #454f6e; border-radius:16px;
+    padding:14px 22px; font-size:14px; font-weight:700; text-align:center; line-height:1.6;
+    opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; max-width:86%;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) scale(1); }
+
+  .shake { animation:shake .4s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+
+  /* 오프라인 수익 모달 */
+  #modal {
+    position:absolute; inset:0; z-index:40; background:rgba(10,13,20,.7);
+    display:none; align-items:center; justify-content:center; padding:24px;
+  }
+  #modal.show { display:flex; }
+  #modalCard {
+    background:#1b2233; border-radius:20px; padding:26px 22px; text-align:center; width:100%;
+    border:1px solid #333d5c;
+  }
+  #modalCard .big { font-size:46px; }
+  #modalCard h3 { font-size:17px; margin:8px 0 4px; }
+  #modalCard p { font-size:13px; color:#8f9bbd; line-height:1.6; }
+  #modalCard .gold { color:#ffd76a; font-weight:900; font-size:20px; }
+  #modalBtn {
+    margin-top:16px; width:100%; padding:14px; border:none; border-radius:12px; cursor:pointer;
+    background:linear-gradient(180deg,#6c5ce7,#4834d4); color:#fff; font-size:15px; font-weight:900; font-family:inherit;
+  }
+  #muteBtn {
+    position:absolute; top:calc(env(safe-area-inset-top,0px) + 8px); right:10px; z-index:6;
+    background:#242c42aa; border:none; border-radius:50%; width:34px; height:34px; font-size:15px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div id="rankRow">
+      <span id="rankBadge">🪪 인턴</span>
+      <div id="rankProgress"><div></div></div>
+      <span id="warnDots">🟢🟢🟢</span>
+    </div>
+    <div id="lpRow"><span id="lp">0</span><span id="lpUnit">LP</span></div>
+    <div id="rateRow"><span>⌨️ 홀드 <b id="holdRate">1</b>/초</span><span>🤖 자동 <b id="autoRate">0</b>/초</span></div>
+  </div>
+  <button id="muteBtn">🔊</button>
+
+  <div id="scene">
+    <div id="office">
+      <div class="window w1"></div><div class="window w2"></div>
+    </div>
+    <div id="fever">🚨 칼퇴 찬스! 전 수익 x3</div>
+    <div id="boss">
+      <span id="bossAlert">!</span>
+      <span id="bossEmoji">🧑‍💼</span>
+      <span id="bossTag">부장님 (일하는 중)</span>
+    </div>
+    <div id="pot"><small>미저금 포인트</small><span id="potVal">0</span></div>
+    <div id="combo"><small>콤보 배율</small><span id="comboVal">x1.0</span></div>
+    <div id="desk">
+      <div id="monitor"><div id="screenContent">📊</div></div>
+      <span id="me">🧑‍💻</span>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button id="holdBtn">😴 꾹 눌러서 딴짓하기<small>누르는 동안 배율 상승 · 상사가 보면 놓기!</small></button>
+    <div id="tabs">
+      <button class="tabBtn" id="shopTab">🛒 아이템 상점 <span class="dot">●</span></button>
+      <button class="tabBtn" id="promoTab">📈 승진 <span class="dot">●</span></button>
+    </div>
+  </div>
+
+  <!-- 상점 시트 -->
+  <div class="sheet" id="shopSheet">
+    <div class="sheetHead"><h2>🛒 월급루팡 장비 상점</h2><button class="closeBtn" data-close="shopSheet">✕</button></div>
+    <div class="sheetBody" id="shopList"></div>
+  </div>
+
+  <!-- 승진 시트 -->
+  <div class="sheet" id="promoSheet">
+    <div class="sheetHead"><h2>📈 인사고과 (승진)</h2><button class="closeBtn" data-close="promoSheet">✕</button></div>
+    <div class="sheetBody"><div id="promoBox"></div></div>
+  </div>
+
+  <div id="floats"></div>
+  <div id="toast"></div>
+  <div id="modal"><div id="modalCard">
+    <div class="big">🌙</div><h3>자리 비운 사이에도 벌었다!</h3>
+    <p id="modalDesc"></p><div class="gold" id="modalGold"></div>
+    <button id="modalBtn">💰 수익 받기</button>
+  </div></div>
+</div>
+
+<script>
+'use strict';
+/* ═══════════════ 데이터 정의 ═══════════════ */
+const RANKS = ['인턴','수습','사원','주임','대리','과장','차장','부장','이사','상무','전무','사장','회장'];
+const RANK_ICONS = ['🪪','📎','🧑‍💼','📋','☕','📊','💼','🏢','🚁','🥃','🛩️','👑','🏝️'];
+// 승진 요구 누적 LP (직급 인덱스 → 다음 직급 비용)
+const promoCost = i => Math.floor(500 * Math.pow(6.5, i));
+
+const UPGRADES = [
+  { id:'kbd',  icon:'⌨️', name:'키보드 업그레이드', desc:'홀드 기본 수익 +1/초',
+    tiers:['멤브레인','무소음 키보드','기계식 축교체','무접점 커스텀','홀로그램 키보드'],
+    base:15, mult:1.6, effect:'+1/초' },
+  { id:'crew', icon:'🧑‍💻', name:'인맥 영입', desc:'자동 수익 +2/초 (오프라인 적립)',
+    tiers:['입사 동기','착한 후배','아웃소싱','야근 요정','AI비서 GPT-대리'],
+    base:40, mult:1.7, effect:'+2/초 자동' },
+  { id:'eye',  icon:'👀', name:'눈치력 강화', desc:'상사 경고 시간 +0.15초',
+    tiers:['반사필름 모니터','백미러 스티커','소리 감지 이어폰','스마트워치 진동','육감 개화'],
+    base:60, mult:2.2, max:8, effect:'+0.15초 경고' },
+  { id:'guts', icon:'💪', name:'배짱 키우기', desc:'최대 콤보 배율 +0.5',
+    tiers:['아메리카노 샷추가','제육 곱빼기','반차 쓴 사람 멘탈','퇴사각 재는 자','무념무상'],
+    base:80, mult:2.0, max:10, effect:'+0.5 배율' },
+  { id:'coffee', icon:'☕', name:'커피 상납 (소모품)', desc:'걸려도 1회 무효! (최대 3개 보유)',
+    tiers:['아이스 아메리카노'], base:120, mult:1.9, consumable:true, effect:'실드 +1' },
+];
+
+/* ═══════════════ 상태 ═══════════════ */
+const S = {
+  lp: 0, lifetime: 0, rank: 0,
+  up: { kbd:0, crew:0, eye:0, guts:0 },
+  shields: 0, strikes: 0,
+  muted: false, lastSeen: Date.now(),
+};
+const now = () => Date.now();
+const rankMult = () => 1 + S.rank * 0.3;
+const holdRate = () => (1 + S.up.kbd) * rankMult();          // 홀드 기본 /초
+const autoRate = () => (S.up.crew * 2) * rankMult();          // 자동 /초
+const warnTime = () => 0.8 + S.up.eye * 0.15;                 // 경고(수상함) 지속 초
+const maxCombo = () => 2.0 + S.up.guts * 0.5;                 // 최대 배율
+const upCost = (u) => Math.floor(u.base * Math.pow(u.mult, lvlOf(u)));
+const lvlOf = (u) => u.consumable ? S.shields : (S.up[u.id] || 0);
+
+/* ═══════════════ 저장/로드 ═══════════════ */
+const KEY = 'wagelupin_v1';
+function save() { S.lastSeen = now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY));
+    if (d) Object.assign(S, d, { up: Object.assign({kbd:0,crew:0,eye:0,guts:0}, d.up) });
+  } catch(e){}
+}
+
+/* ═══════════════ 사운드 (WebAudio 경량) ═══════════════ */
+let AC = null;
+function beep(freq, dur=0.08, type='square', vol=0.04) {
+  if (S.muted) return;
+  try {
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
+    o.connect(g).connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + dur);
+  } catch(e){}
+}
+const sndBank   = () => { beep(660,.06); setTimeout(()=>beep(880,.08),60); };
+const sndWarn   = () => beep(440,.12,'sawtooth',.05);
+const sndCaught = () => { beep(220,.2,'sawtooth',.06); setTimeout(()=>beep(150,.3,'sawtooth',.06),120); };
+const sndBuy    = () => { beep(523,.06); setTimeout(()=>beep(784,.1),70); };
+const sndPromo  = () => [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.12,'triangle',.05), i*110));
+
+/* ═══════════════ 숫자 포맷 ═══════════════ */
+function fmt(n) {
+  n = Math.floor(n);
+  if (n < 1e4) return n.toLocaleString('ko-KR');
+  const units = [[1e12,'조'],[1e8,'억'],[1e4,'만']];
+  for (const [v,u] of units) if (n >= v) {
+    const w = n / v;
+    return (w >= 100 ? Math.floor(w) : w.toFixed(1).replace(/\.0$/,'')) + u;
+  }
+  return String(n);
+}
+
+/* ═══════════════ DOM 참조 ═══════════════ */
+const $ = id => document.getElementById(id);
+const el = {
+  lp:$('lp'), holdRate:$('holdRate'), autoRate:$('autoRate'),
+  rankBadge:$('rankBadge'), rankBar:document.querySelector('#rankProgress > div'),
+  warnDots:$('warnDots'), boss:$('boss'), bossEmoji:$('bossEmoji'), bossTag:$('bossTag'),
+  combo:$('combo'), comboVal:$('comboVal'), pot:$('pot'), potVal:$('potVal'),
+  holdBtn:$('holdBtn'), me:$('me'), screen:$('screenContent'),
+  floats:$('floats'), toast:$('toast'), app:$('app'), fever:$('fever'),
+  shopSheet:$('shopSheet'), promoSheet:$('promoSheet'), shopList:$('shopList'), promoBox:$('promoBox'),
+  shopTab:$('shopTab'), promoTab:$('promoTab'),
+  modal:$('modal'), modalDesc:$('modalDesc'), modalGold:$('modalGold'), modalBtn:$('modalBtn'),
+  muteBtn:$('muteBtn'),
+};
+
+/* ═══════════════ 게임 루프 상태 ═══════════════ */
+let holding = false, combo = 1.0, pot = 0;
+let bossState = 'working';       // working | suspicious | watching
+let bossTimer = 0;               // 현재 상태 남은 시간(초)
+let feverT = 0;                  // 피버 남은 시간
+let feverCd = 45 + Math.random()*60; // 다음 피버까지
+let toastT = null;
+
+function bossNext() {
+  if (bossState === 'working') { bossState = 'suspicious'; bossTimer = warnTime(); sndWarn();
+    el.bossTag.textContent = '부장님 (뭔가 수상한데…)';
+  } else if (bossState === 'suspicious') { bossState = 'watching'; bossTimer = 1.5 + Math.random();
+    el.bossTag.textContent = '부장님 (감시 중!) 👁️';
+    if (holding) caught();
+  } else { bossState = 'working'; bossTimer = 3 + Math.random()*5;
+    el.bossTag.textContent = '부장님 (일하는 중)';
+  }
+  el.boss.className = bossState === 'working' ? '' : bossState;
+  el.bossEmoji.textContent = bossState === 'watching' ? '🫵' : '🧑‍💼';
+}
+
+function caught() {
+  stopHold(false);
+  if (S.shields > 0) {
+    S.shields--;
+    floatText('☕ 커피 상납으로 위기 모면!', 'gold');
+    toast('☕ "부장님, 아아 한 잔 하시죠~"<br>실드 1개 사용됨');
+    sndBuy(); renderAll(); save();
+    return;
+  }
+  const lost = Math.floor(pot);
+  pot = 0; combo = 1.0;
+  S.strikes++;
+  sndCaught();
+  el.app.classList.remove('shake'); void el.app.offsetWidth; el.app.classList.add('shake');
+  if (navigator.vibrate) navigator.vibrate([80,40,120]);
+  floatText(lost > 0 ? `-${fmt(lost)} LP 몰수!` : '들켰다!', 'bad');
+  if (S.strikes >= 3) {
+    const fine = Math.floor(S.lp * 0.1);
+    S.lp -= fine; S.strikes = 0;
+    toast(`📝 <b>시말서 작성…</b><br>경고 3회 누적으로 LP 10% (${fmt(fine)}) 차감`);
+  } else {
+    toast(`🚨 <b>딱 걸렸다!</b> 미저금 ${fmt(lost)} LP 몰수<br>경고 ${S.strikes}/3 — 3회면 시말서!`);
+  }
+  renderAll(); save();
+}
+
+/* ═══════════════ 홀드 조작 ═══════════════ */
+function startHold(e) {
+  if (e) e.preventDefault();
+  if (holding) return;
+  if (bossState === 'watching') { caught(); return; } // 감시 중에 누르면 바로 걸림
+  holding = true; combo = 1.0; pot = 0;
+  el.holdBtn.classList.add('held');
+  el.me.classList.add('typing'); el.me.textContent = '😎';
+  el.screen.classList.add('slacking'); el.screen.textContent = '📱';
+  el.combo.classList.add('on'); el.pot.classList.add('on');
+  beep(880,.04,'sine',.03);
+}
+function stopHold(bank = true) {
+  if (!holding) return;
+  holding = false;
+  el.holdBtn.classList.remove('held');
+  el.me.classList.remove('typing'); el.me.textContent = '🧑‍💻';
+  el.screen.classList.remove('slacking'); el.screen.textContent = '📊';
+  el.combo.classList.remove('on'); el.pot.classList.remove('on');
+  if (bank && pot >= 1) {
+    const gain = Math.floor(pot);
+    S.lp += gain; S.lifetime += gain;
+    sndBank();
+    floatText(`+${fmt(gain)} LP 저금!`);
+    save();
+  }
+  pot = 0; combo = 1.0;
+}
+
+/* ═══════════════ 메인 루프 ═══════════════ */
+let last = now();
+function tick() {
+  const t = now(), dt = Math.min((t - last) / 1000, 0.5);
+  last = t;
+  const fever = feverT > 0 ? 3 : 1;
+
+  // 상사 AI
+  bossTimer -= dt;
+  if (bossTimer <= 0) bossNext();
+
+  // 피버
+  if (feverT > 0) { feverT -= dt; if (feverT <= 0) { el.fever.style.display = 'none'; } }
+  else { feverCd -= dt; if (feverCd <= 0) { feverT = 10; feverCd = 60 + Math.random()*90;
+    el.fever.style.display = 'block'; sndPromo(); if (navigator.vibrate) navigator.vibrate(60); } }
+
+  // 자동 수익 (항상 안전하게 저금)
+  const auto = autoRate() * fever * dt;
+  if (auto > 0) { S.lp += auto; S.lifetime += auto; }
+
+  // 홀드 수익 (pot에 누적, 놓아야 저금)
+  if (holding) {
+    combo = Math.min(maxCombo(), combo + dt * 0.5);
+    pot += holdRate() * combo * fever * dt;
+  }
+
+  render();
+  requestAnimationFrame(tick);
+}
+
+/* ═══════════════ 렌더 ═══════════════ */
+function render() {
+  el.lp.textContent = fmt(S.lp);
+  el.comboVal.textContent = 'x' + combo.toFixed(1);
+  el.potVal.textContent = fmt(pot);
+  if (S.rank < RANKS.length - 1) {
+    el.rankBar.style.width = Math.min(100, S.lifetime / promoCost(S.rank) * 100) + '%';
+  } else el.rankBar.style.width = '100%';
+  // 탭 알림 점
+  el.promoTab.classList.toggle('notify', canPromote());
+  el.shopTab.classList.toggle('notify', UPGRADES.some(u => canBuy(u)));
+}
+function renderAll() {
+  el.holdRate.textContent = fmt(holdRate());
+  el.autoRate.textContent = fmt(autoRate());
+  el.rankBadge.textContent = RANK_ICONS[S.rank] + ' ' + RANKS[S.rank];
+  el.warnDots.textContent = ['🟢🟢🟢','🟡🟢🟢','🔴🟡🟢'][S.strikes] || '🔴🔴🔴';
+  renderShop(); renderPromo(); render();
+}
+
+const canBuy = u => S.lp >= upCost(u) && !atMax(u);
+const atMax = u => u.consumable ? S.shields >= 3 : (u.max && lvlOf(u) >= u.max);
+
+function renderShop() {
+  el.shopList.innerHTML = UPGRADES.map(u => {
+    const lv = lvlOf(u);
+    const tierName = u.consumable ? `보유 ${S.shields}/3개`
+      : (u.tiers[Math.min(lv, u.tiers.length-1)] + (lv >= u.tiers.length ? ` +${lv - u.tiers.length + 1}` : ''));
+    return `<div class="shopItem">
+      <div class="icon">${u.icon}</div>
+      <div class="info"><b>${u.name}</b><span>${u.desc}</span>
+        <span class="lvl">Lv.${lv} · ${tierName}</span></div>
+      <button class="buyBtn" data-buy="${u.id}" ${canBuy(u)?'':'disabled'}>
+        ${atMax(u) ? 'MAX' : '💰 ' + fmt(upCost(u))}</button>
+    </div>`;
+  }).join('');
+}
+
+const canPromote = () => S.rank < RANKS.length - 1 && S.lifetime >= promoCost(S.rank);
+function renderPromo() {
+  const lastRank = S.rank >= RANKS.length - 1;
+  el.promoBox.innerHTML = lastRank
+    ? `<div class="big">🏝️</div><h3>회장님, 이제 그만…</h3>
+       <p>더 오를 곳이 없습니다.<br>이제 회사가 당신의 딴짓입니다.<br>누적 ${fmt(S.lifetime)} LP 달성!</p>`
+    : `<div class="big">${RANK_ICONS[S.rank+1]}</div>
+       <h3>${RANKS[S.rank]} → <b style="color:#ffd76a">${RANKS[S.rank+1]}</b> 승진</h3>
+       <p>누적 LP <b>${fmt(S.lifetime)}</b> / ${fmt(promoCost(S.rank))}<br><br>
+       승진하면 장비는 초기화되지만<br><b style="color:#7ee0a3">짬바 영구 배율 +30%</b>를 얻습니다.<br>
+       (현재 배율 x${rankMult().toFixed(1)})</p>
+       <button id="promoBtn" ${canPromote()?'':'disabled'}>
+         ${canPromote() ? '📈 승진하기!' : '누적 LP가 더 필요해요'}</button>`;
+  const b = $('promoBtn');
+  if (b) b.onclick = doPromote;
+}
+
+function doPromote() {
+  if (!canPromote()) return;
+  S.rank++;
+  S.lp = 0; S.up = {kbd:0,crew:0,eye:0,guts:0}; S.shields = 0; S.strikes = 0;
+  stopHold(false);
+  sndPromo();
+  if (navigator.vibrate) navigator.vibrate([60,40,60,40,120]);
+  toast(`🎉 <b>${RANKS[S.rank]} 승진!</b><br>짬바 배율 x${rankMult().toFixed(1)} 적용<br>"이 맛에 회사 다니지"`);
+  closeSheet('promoSheet');
+  renderAll(); save();
+}
+
+/* ═══════════════ 이펙트 ═══════════════ */
+function floatText(txt, cls='') {
+  const d = document.createElement('div');
+  d.className = 'floatTxt ' + cls;
+  d.textContent = txt;
+  d.style.left = (20 + Math.random()*50) + '%';
+  d.style.top = (35 + Math.random()*20) + '%';
+  el.floats.appendChild(d);
+  setTimeout(() => d.remove(), 1000);
+}
+function toast(html) {
+  el.toast.innerHTML = html;
+  el.toast.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.toast.classList.remove('show'), 2600);
+}
+
+/* ═══════════════ 시트/UI 이벤트 ═══════════════ */
+function openSheet(id) { $(id).classList.add('open'); }
+function closeSheet(id) { $(id).classList.remove('open'); }
+el.shopTab.onclick = () => { renderShop(); openSheet('shopSheet'); };
+el.promoTab.onclick = () => { renderPromo(); openSheet('promoSheet'); };
+document.querySelectorAll('.closeBtn').forEach(b => b.onclick = () => closeSheet(b.dataset.close));
+
+el.shopList.addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.buy;
+  if (!id) return;
+  const u = UPGRADES.find(x => x.id === id);
+  if (!u || !canBuy(u)) return;
+  S.lp -= upCost(u);
+  if (u.consumable) S.shields++;
+  else S.up[u.id]++;
+  sndBuy();
+  renderAll(); save();
+});
+
+// 홀드 버튼: 터치/마우스 모두
+const hb = el.holdBtn;
+hb.addEventListener('touchstart', startHold, {passive:false});
+hb.addEventListener('mousedown', startHold);
+['touchend','touchcancel'].forEach(ev => hb.addEventListener(ev, e => { e.preventDefault(); stopHold(); }, {passive:false}));
+window.addEventListener('mouseup', () => stopHold());
+window.addEventListener('blur', () => stopHold());
+document.addEventListener('visibilitychange', () => { if (document.hidden) { stopHold(); save(); } });
+// 스페이스바 지원 (데스크톱 테스트용)
+window.addEventListener('keydown', e => { if (e.code === 'Space' && !e.repeat) { e.preventDefault(); startHold(); } });
+window.addEventListener('keyup', e => { if (e.code === 'Space') stopHold(); });
+
+el.muteBtn.onclick = () => { S.muted = !S.muted; el.muteBtn.textContent = S.muted ? '🔇' : '🔊'; save(); };
+
+/* ═══════════════ 오프라인 수익 ═══════════════ */
+function offlineEarnings() {
+  const away = (now() - S.lastSeen) / 1000;
+  if (away < 120 || autoRate() <= 0) return; // 2분 미만은 무시
+  const capped = Math.min(away, 8 * 3600);   // 최대 8시간
+  const gain = Math.floor(autoRate() * 0.5 * capped);
+  if (gain < 1) return;
+  S.lp += gain; S.lifetime += gain;
+  const h = Math.floor(capped/3600), m = Math.floor(capped%3600/60);
+  el.modalDesc.innerHTML = `${h>0?h+'시간 ':''}${m}분 동안 후배들이 몰래 일했습니다.<br>(자동 수익의 50% 적립, 최대 8시간)`;
+  el.modalGold.textContent = '+' + fmt(gain) + ' LP';
+  el.modal.classList.add('show');
+  save();
+}
+el.modalBtn.onclick = () => { el.modal.classList.remove('show'); sndBank(); };
+
+/* ═══════════════ 시작 ═══════════════ */
+load();
+offlineEarnings();
+bossTimer = 3 + Math.random()*4;
+renderAll();
+setInterval(save, 10000);
+window.addEventListener('pagehide', save);
+requestAnimationFrame(tick);
+
+// 첫 방문 안내
+if (S.lifetime === 0) {
+  setTimeout(() => toast(
+    '🕶️ <b>월급루팡에 오신 걸 환영합니다</b><br>버튼을 <b>꾹 누르면</b> 딴짓 시작!<br>부장님이 <b style="color:#ffd76a">"!"</b> 하면 얼른 놓으세요.'), 700);
+}
+</script>
+</body>
+</html>
